@@ -2,7 +2,7 @@
 # Paper-based setup: ResNet-50 backbone + margin-based heads + SGD + cosine verification
 
 
-print("Kod SLURM altında başladı", flush=True)
+#print("Kod SLURM altında başladı", flush=True)
 
 import os
 import torch
@@ -27,6 +27,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # ------------------------- ArcMarginProduct -------------------------
+
 class ArcMarginProduct(nn.Module):
     def __init__(self, in_features, out_features, s=30.0, m=0.5):
         super().__init__()
@@ -50,6 +51,7 @@ class ArcMarginProduct(nn.Module):
         return output
 
 # ------------------------- AdaFace Margin Head -------------------------
+
 class AdaFaceHead(nn.Module):
     def __init__(self, embedding_size, num_classes, m=0.4, h=0.333, s=64.0):
         super().__init__()
@@ -79,6 +81,7 @@ class AdaFaceHead(nn.Module):
 
 
 # ------------------------- MagFace Margin Head -------------------------
+
 class MagFaceHead(nn.Module):
     def __init__(self, embedding_size, num_classes, s=64.0, m=0.5, a=10.0, b=110.0):
         super().__init__()
@@ -102,6 +105,7 @@ class MagFaceHead(nn.Module):
         return output
 
 # ------------------------- GhostFaceNet Margin Head -------------------------
+
 class GhostFaceNetHead(nn.Module):
     def __init__(self, embedding_size, num_classes, s=64.0):
         super().__init__()
@@ -118,6 +122,7 @@ class GhostFaceNetHead(nn.Module):
         return output
 
 # ------------------------- CosFace Margin Head -------------------------
+
 class CosFaceHead(nn.Module):
     def __init__(self, embedding_size, num_classes, s=64.0, m=0.35):
         super().__init__()
@@ -135,6 +140,7 @@ class CosFaceHead(nn.Module):
         return output
 
 # ------------------------- SphereFace Margin Head -------------------------
+
 class SphereFaceHead(nn.Module):
     def __init__(self, embedding_size, num_classes, s=64.0, m=1.35):
         super().__init__()
@@ -154,6 +160,7 @@ class SphereFaceHead(nn.Module):
         return output
 
 # ------------------------- Backbone Wrapper -------------------------
+
 def build_model(model_type, num_classes):
     embedding_size = 512
 
@@ -203,6 +210,7 @@ def build_model(model_type, num_classes):
 
 
 # ------------------------- YLFW Dataset -------------------------
+
 class YLFWTrainDataset(Dataset):
     def __init__(self, root_dir, transform=None):
         self.samples = []
@@ -228,6 +236,7 @@ class YLFWTrainDataset(Dataset):
         return img, label
 
 # ------------------------- Pair Evaluation -------------------------
+
 def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
@@ -296,6 +305,7 @@ def save_results_and_plots(model_name, results, train_losses, val_losses, model,
 
 
     # ROC Curve
+    
     fpr, tpr, _ = roc_curve(labels, scores)
     roc_auc = auc(fpr, tpr)
     plt.figure()
@@ -309,7 +319,8 @@ def save_results_and_plots(model_name, results, train_losses, val_losses, model,
     plt.close()
 
 
-    # ROC bilgilerinin global listeye eklenmesi
+    # ROC info
+    
     all_model_rocs.append({
         'model_name': model_name,
         'fpr': fpr,
@@ -318,6 +329,7 @@ def save_results_and_plots(model_name, results, train_losses, val_losses, model,
     })
 
      # Loss Plot
+    
     plt.figure()
     plt.plot(train_losses, label='Train Loss')
     plt.plot(val_losses, label='Validation Loss')
@@ -329,6 +341,7 @@ def save_results_and_plots(model_name, results, train_losses, val_losses, model,
     plt.close()
 
     # Save confusion matrix (if binary classification like pair matching)
+    
     pred_labels = np.array(scores) > 0.5
     cm = confusion_matrix(labels, pred_labels)
     plt.figure()
@@ -337,7 +350,6 @@ def save_results_and_plots(model_name, results, train_losses, val_losses, model,
     plt.colorbar()
     plt.xlabel('Predicted')
     plt.ylabel('True')
-     # Hücre içlerine sayıları yaz
     thresh = cm.max() / 2
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
@@ -350,6 +362,7 @@ def save_results_and_plots(model_name, results, train_losses, val_losses, model,
     plt.close()
 
     # Save metrics to CSV
+    
     fnmr1 = 1 - tpr[np.where(fpr <= 1e-1)[0][-1]] if np.any(fpr <= 1e-1) else 1.0
     fnmr2 = 1 - tpr[np.where(fpr <= 1e-2)[0][-1]] if np.any(fpr <= 1e-2) else 1.0
     fnr = 1 - tpr
@@ -365,6 +378,7 @@ def save_results_and_plots(model_name, results, train_losses, val_losses, model,
         df.to_csv(results_path, index=False)
 
         # Save race-based metrics if available
+    
     if 'race_metrics' in results:
         race_df = pd.DataFrame([
             [model_name, race, m['FNMR@1e-1'], m['FNMR@1e-2'], m['EER'], m['AUC'], m['Accuracy']]
@@ -378,6 +392,7 @@ def save_results_and_plots(model_name, results, train_losses, val_losses, model,
             race_df.to_csv(race_results_path, index=False)
     
     # Save model
+    
     torch.save(model.state_dict(), f"outputs_n7/{model_name}.pth")
 
     return {
@@ -403,17 +418,20 @@ def train_and_evaluate_all():
         transforms.Normalize([0.5]*3, [0.5]*3)
     ])
 
-     # Birleştirilen eğitim verisi
+    #Concat train data
+    
     dataset_original = YLFWTrainDataset(train_root1, transform)
     dataset_augmented = YLFWTrainDataset(train_root2, transform)
 
-    # Sadece orijinal veriyi train/val olarak böl
+    #Split only original data as train/val 
+    
     total_len = len(dataset_original)
     val_len = int(0.2 * total_len)
     train_len = total_len - val_len
     train_dataset, val_dataset = random_split(dataset_original, [train_len, val_len])
 
-    # Augmente veriyi sadece train'e ekle
+    # Add augmented data only to trainset
+    
     combined_train_dataset = torch.utils.data.ConcatDataset([train_dataset, dataset_augmented])
     train_loader = DataLoader(combined_train_dataset, batch_size=256, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False)
@@ -457,6 +475,7 @@ def train_and_evaluate_all():
             train_accuracies.append(train_acc)
 
             # Validation
+            
             model.eval()
             val_loss = 0
             correct = 0
@@ -488,6 +507,7 @@ def train_and_evaluate_all():
         save_results_and_plots(model_name, results, train_losses, val_losses, model, train_accuracies, val_accuracies)
 
         # Extra: Plot accuracy curves
+        
         plt.figure()
         plt.plot(train_accuracies, label="Train Accuracy")
         plt.plot(val_accuracies, label="Validation Accuracy")
@@ -499,6 +519,7 @@ def train_and_evaluate_all():
         plt.close()
 
         # Extra: Plot val loss curve
+        
         plt.figure()
         plt.plot(train_losses, label="Train Loss")
         plt.plot(val_losses, label="Validation Loss")
@@ -509,7 +530,7 @@ def train_and_evaluate_all():
         plt.savefig(f"outputs_n7/{model_name}_train_val_loss_curve.png")
         plt.close()
 
-    # Tüm modeller için tek ROC grafiği çiz
+    # Roc curve for all models
         
     plt.figure()
     for roc in all_model_rocs:
